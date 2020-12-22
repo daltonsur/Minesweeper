@@ -4,12 +4,23 @@ import tkinter as tk
 
 
 class Square:
-    def __init__(self):
+    def __init__(self, row, col, game):
         self.seen = ' '
         self.real = 0
         self.flagged = False
+        self.row = row
+        self.col = col
+        self.game = game
         self.canvas = tk.Canvas(window, width=25, height=25)
-        self.canvas.create_image(0, 0, image=get('empty'), anchor=tk.NW)
+        self.canvas.create_image(0, 0, image=get(' '), anchor=tk.NW)
+        self.canvas.bind("<1>", self.left_click)
+        self.canvas.bind("<3>", self.right_click)
+
+    def left_click(self, event):
+        self.game.left_click(self.row, self.col)
+
+    def right_click(self, event):
+        self.game.right_click(self.row, self.col)
 
 
 class Game:
@@ -27,11 +38,58 @@ class Game:
             self.height = 16
             self.width = 30
             self.num_mines = 99
-        self.board = [[Square() for _ in range(self.width)] for _ in range(self.height)]
+        self.board = [[Square(row, col, self) for col in range(self.width)] for row in range(self.height)]
+        self.filled = False
         self.vis = []
-        self.flags = []
+        self.flags = 0
+        self.game_over = False
 
-    def fill_board(self, col, row):
+    def left_click(self, row, col):
+        if self.game_over:
+            return
+        square = self.board[row][col]
+        if square.flagged:
+            return
+        if square.seen != ' ':
+            return
+        if not self.filled:
+            self.fill_board(row, col)
+            self.set_nums()
+            self.filled = True
+        if square.real == -1:
+            self.show_mines()
+        elif square.real == 0:
+            self.neighbours(row, col)
+        else:
+            self.reveal(row, col)
+        self.check_over()
+
+    def right_click(self, row, col):
+        if self.game_over:
+            return
+        square = self.board[row][col]
+        if not self.filled:
+            return
+        if square.flagged:
+            square.flagged = False
+            self.flags -= 1
+            self.set_seen(row, col, ' ')
+        elif square.seen != ' ':
+            return
+        elif self.flags < self.num_mines:
+            square.flagged = True
+            self.flags += 1
+            self.set_seen(row, col, 'f')
+
+    def reveal(self, row, col):
+        self.set_seen(row, col, self.board[row][col].real)
+
+    def set_seen(self, row, col, value):
+        square = self.board[row][col]
+        square.seen = value
+        square.canvas.create_image(0, 0, image=get(value), anchor=tk.NW)
+
+    def fill_board(self, row, col):
         # Track of number of mines already set up
         count = 0
         while count < self.num_mines:
@@ -92,7 +150,7 @@ class Game:
             # If cell is zero
             if self.board[row][col].real == 0:
                 # Display it to user
-                self.board[row][col].seen = self.board[row][col].real
+                self.reveal(row, col)
 
                 # Recursive call on neighbors
                 if row > 0:
@@ -114,7 +172,7 @@ class Game:
 
             # If cell not zero
             if self.board[row][col].real != 0:
-                self.board[row][col].seen = self.board[row][col].real
+                self.reveal(row, col)
 
     def check_over(self):
         count = 0
@@ -124,20 +182,22 @@ class Game:
             for col in range(self.width):
 
                 # If cell not empty or flagged
-                if self.board[row][col].seen != ' ' and self.board[row][col].real != 'F':
+                if self.board[row][col].seen != ' ' and not self.board[row][col].flagged:
                     count += 1
 
         # Count comparison
         if count == self.width * self.height - self.num_mines:
-            return True
+            self.show_mines()
+            self.game_over = True
         else:
             return False
 
     def show_mines(self):
+        self.game_over = True
         for row in range(self.height):
             for col in range(self.width):
                 if self.board[row][col].real == -1:
-                    self.board[row][col].seen = 'M'
+                    self.reveal(row, col)
 
     def build_gui(self):
         window.columnconfigure([x for x in range(self.width)], minsize=25)
@@ -146,6 +206,7 @@ class Game:
         for row in range(self.height):
             for col in range(self.width):
                 self.board[row][col].canvas.grid(row=row, column=col)
+
 
 def print_mines_layout():
     global mine_values
@@ -186,18 +247,18 @@ def print_mines_layout():
 
 # Referenced https://stackoverflow.com/questions/53861528/runtimeerror-too-early-to-create-image/53861790
 imagelist = {
-    '0': ['images/0.png', None],
-    '1': ['images/1.png', None],
-    '2': ['images/2.png', None],
-    '3': ['images/3.png', None],
-    '4': ['images/4.png', None],
-    '5': ['images/5.png', None],
-    '6': ['images/6.png', None],
-    '7': ['images/7.png', None],
-    '8': ['images/8.png', None],
-    'bomb': ['images/bomb.png', None],
-    'flag': ['images/flagged.png', None],
-    'empty': ['images/facingDown.png', None],
+    0: ['images/0.png', None],
+    1: ['images/1.png', None],
+    2: ['images/2.png', None],
+    3: ['images/3.png', None],
+    4: ['images/4.png', None],
+    5: ['images/5.png', None],
+    6: ['images/6.png', None],
+    7: ['images/7.png', None],
+    8: ['images/8.png', None],
+    -1: ['images/bomb.png', None],
+    'f': ['images/flagged.png', None],
+    ' ': ['images/facingDown.png', None],
 }
 
 
@@ -211,7 +272,7 @@ def get(name):
 
 if __name__ == '__main__':
 
-    diff = "Beginner"
+    diff = "Expert"
 
     window = tk.Tk()
     window.resizable(False, False)
