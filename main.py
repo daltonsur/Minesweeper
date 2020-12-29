@@ -1,5 +1,6 @@
 import os
 import random
+import sys
 import tkinter as tk
 
 
@@ -51,6 +52,8 @@ class Game:
         if square.flagged:
             return
         if square.seen != ' ':
+            if self.check_full(row, col):
+                self.reveal_neighbors(row, col)
             return
         if not self.filled:
             self.fill_board(row, col)
@@ -63,6 +66,108 @@ class Game:
         else:
             self.reveal(row, col)
         self.check_over()
+
+    def check_full(self, row, col):
+        num_flags = 0
+        # Check up
+        if row > 0 and self.board[row - 1][col].flagged:
+            num_flags += 1
+        # Check down
+        if row < self.height - 1 and self.board[row + 1][col].flagged:
+            num_flags += 1
+        # Check left
+        if col > 0 and self.board[row][col - 1].flagged:
+            num_flags += 1
+        # Check right
+        if col < self.width - 1 and self.board[row][col + 1].flagged:
+            num_flags += 1
+        # Check top-left
+        if row > 0 and col > 0 and self.board[row - 1][col - 1].flagged:
+            num_flags += 1
+        # Check top-right
+        if row > 0 and col < self.width - 1 and self.board[row - 1][col + 1].flagged:
+            num_flags += 1
+        # Check below-left
+        if row < self.height - 1 and col > 0 and self.board[row + 1][col - 1].flagged:
+            num_flags += 1
+        # Check below-right
+        if row < self.height - 1 and col < self.width - 1 and self.board[row + 1][col + 1].flagged:
+            num_flags += 1
+
+        return num_flags == self.board[row][col].real
+
+    def reveal_neighbors(self, row, col):
+        if row > 0:
+            if self.board[row - 1][col].real == 0:
+                self.neighbours(row - 1, col)
+            elif self.board[row - 1][col].real == -1:
+                if not self.board[row - 1][col].flagged:
+                    self.show_mines()
+            else:
+                self.reveal(row - 1, col)
+        # Check down
+        if row < self.height - 1:
+            if self.board[row + 1][col].real == 0:
+                self.neighbours(row + 1, col)
+            elif self.board[row + 1][col].real == -1:
+                if not self.board[row + 1][col].flagged:
+                    self.show_mines()
+            else:
+                self.reveal(row + 1, col)
+        # Check left
+        if col > 0:
+            if self.board[row][col - 1].real == 0:
+                self.neighbours(row, col - 1)
+            elif self.board[row][col - 1].real == -1:
+                if not self.board[row][col - 1].flagged:
+                    self.show_mines()
+            else:
+                self.reveal(row, col - 1)
+        # Check right
+        if col < self.width - 1:
+            if self.board[row][col + 1].real == 0:
+                self.neighbours(row, col + 1)
+            elif self.board[row][col + 1].real == -1:
+                if not self.board[row][col + 1].flagged:
+                    self.show_mines()
+            else:
+                self.reveal(row, col + 1)
+        # Check top-left
+        if row > 0 and col > 0:
+            if self.board[row - 1][col - 1].real == 0:
+                self.neighbours(row - 1, col - 1)
+            elif self.board[row - 1][col - 1].real == -1:
+                if not self.board[row - 1][col - 1].flagged:
+                    self.show_mines()
+            else:
+                self.reveal(row - 1, col - 1)
+        # Check top-right
+        if row > 0 and col < self.width - 1:
+            if self.board[row - 1][col + 1].real == 0:
+                self.neighbours(row - 1, col + 1)
+            elif self.board[row - 1][col + 1].real == -1:
+                if not self.board[row - 1][col + 1].flagged:
+                    self.show_mines()
+            else:
+                self.reveal(row - 1, col + 1)
+        # Check below-left
+        if row < self.height - 1 and col > 0:
+            if self.board[row + 1][col - 1].real == 0:
+                self.neighbours(row + 1, col - 1)
+            elif self.board[row + 1][col - 1].real == -1:
+                if not self.board[row + 1][col - 1].flagged:
+                    self.show_mines()
+            else:
+                self.reveal(row + 1, col - 1)
+        # Check below-right
+        if row < self.height - 1 and col < self.width - 1:
+            if self.board[row + 1][col + 1].real == 0:
+                self.neighbours(row + 1, col + 1)
+            elif self.board[row + 1][col + 1].real == -1:
+                if not self.board[row + 1][col + 1].flagged:
+                    self.show_mines()
+            else:
+                self.reveal(row + 1, col + 1)
 
     def right_click(self, row, col):
         if self.game_over:
@@ -102,11 +207,38 @@ class Game:
             c = val % self.width
 
             # Place the mine, if it doesn't already have one
-            if r == row and c == col:
+            if row + 1 >= r >= row - 1 and col + 1 >= c >= c - 1:
                 continue
             elif self.board[r][c].real != -1:
                 count += 1
                 self.board[r][c].real = -1
+
+    def get_neighbours(self, row, col):
+        neighbours = []
+        if row > 0:
+            neighbours.append(self.board[row - 1][col])
+        # Check down
+        if row < self.height - 1:
+            neighbours.append(self.board[row + 1][col])
+        # Check left
+        if col > 0:
+            neighbours.append(self.board[row][col - 1])
+        # Check right
+        if col < self.width - 1:
+            neighbours.append(self.board[row][col + 1])
+        # Check top-left
+        if row > 0 and col > 0:
+            neighbours.append(self.board[row - 1][col - 1])
+        # Check top-right
+        if row > 0 and col < self.width - 1:
+            neighbours.append(self.board[row - 1][col + 1])
+        # Check below-left
+        if row < self.height - 1 and col > 0:
+            neighbours.append(self.board[row + 1][col - 1])
+        # Check below-right
+        if row < self.height - 1 and col < self.width - 1:
+            neighbours.append(self.board[row + 1][col + 1])
+        return neighbours
 
     def set_nums(self):
         for row in range(self.height):
@@ -272,7 +404,14 @@ def get(name):
 
 if __name__ == '__main__':
 
-    diff = "Expert"
+    if len(sys.argv) == 2:
+        if sys.argv[1] != 'Beginner' and sys.argv[1] != 'Intermediate' and sys.argv[1] != 'Expert':
+            print("Invalid Input")
+            sys.exit()
+        diff = sys.argv[1]
+    else:
+        print("Invalid Input")
+        sys.exit()
 
     window = tk.Tk()
     window.resizable(False, False)
@@ -282,124 +421,3 @@ if __name__ == '__main__':
     game.build_gui()
 
     window.mainloop()
-
-
-
-    # # Variable for Game Loop
-    # over = False
-    #
-    # # GAME LOOP
-    # while not over:
-    #     print_mines_layout()
-    #
-    #     # Input from user
-    #     inp = input("Enter row number followed by space and column number = ").split()
-    #
-    #     # Standard Move
-    #     if len(inp) == 2:
-    #
-    #         # Try block to handle errant input
-    #         try:
-    #             val = list(map(int, inp))
-    #         except ValueError:
-    #             clear()
-    #             print("Wrong input!")
-    #             instructions()
-    #             continue
-    #     # Flag Input
-    #     elif len(inp) == 3:
-    #         if inp[2] != 'F' and inp[2] != 'f':
-    #             clear()
-    #             print("Wrong Input!")
-    #             instructions()
-    #             continue
-    #
-    #         # Try block to handle errant input
-    #         try:
-    #             val = list(map(int, inp[:2]))
-    #         except ValueError:
-    #             clear()
-    #             print("Wrong input!")
-    #             instructions()
-    #             continue
-    #
-    #         # Sanity Checks
-    #         if val[0] > n or val[0] < 1 or val[1] > n or val[1] < 1:
-    #             clear()
-    #             print("Wrong Input!")
-    #             instructions()
-    #             continue
-    #
-    #         # Get row and column
-    #         r = val[0]-1
-    #         col = val[1]-1
-    #
-    #         # If cell already flagged
-    #         if [r, col] in flags:
-    #             clear()
-    #             print("Flag already set")
-    #             continue
-    #
-    #         # If cell already displayed
-    #         if mine_values[r][col] != ' ':
-    #             clear()
-    #             print("Value already known")
-    #             continue
-    #
-    #         # Check number for flags
-    #         if len(flags) < mines_no:
-    #             clear()
-    #             print("Flag set")
-    #
-    #             # Add flag to list
-    #             flags.append([r, col])
-    #
-    #             # Set the flag for display
-    #             mine_values[r][col] = 'F'
-    #             continue
-    #         else:
-    #             clear()
-    #             print("Flags finished")
-    #             continue
-    #
-    #     # Sanity Checks
-    #     if val[0] > n or val[0] < 1 or val[1] > n or val[1] < 1:
-    #         clear()
-    #         print("Wrong Input!")
-    #         instructions()
-    #         continue
-    #
-    #     # Get row and column
-    #     r = val[0] - 1
-    #     col = val[1] - 1
-    #
-    #     # Unflag cell if flagged
-    #     if [r, col] in flags:
-    #         flags.remove([r, col])
-    #
-    #     # If land on mine -- Game Over
-    #     if numbers[r][col] == -1:
-    #         mine_values[r][col] = 'M'
-    #         show_mines()
-    #         print_mines_layout()
-    #         print("Landed on a mine. GAME OVER!!!!!")
-    #         over = True
-    #         continue
-    #
-    #     # If landing on cell with 0 mines in neighbors
-    #     elif numbers[r][col] == 0:
-    #         vis = []
-    #         mine_values[r][col] = '0'
-    #         neighbours(r, col)
-    #
-    #     # If selecting a normal cell
-    #     else:
-    #         mine_values[r][col] = numbers[r][col]
-    #
-    #     if(check_over()):
-    #         show_mines()
-    #         print_mines_layout()
-    #         print("Congratulations!!! You Win")
-    #         over = True
-    #         continue
-    #     clear()
