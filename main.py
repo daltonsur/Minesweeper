@@ -1,17 +1,16 @@
-import os
 import random
 import sys
 import tkinter as tk
 
 
 class Square:
-    def __init__(self, row, col, game):
+    def __init__(self, row, col, parent_game):
         self.seen = ' '
         self.real = 0
         self.flagged = False
         self.row = row
         self.col = col
-        self.game = game
+        self.game = parent_game
         self.canvas = tk.Canvas(window, width=25, height=25)
         self.canvas.create_image(0, 0, image=get(' '), anchor=tk.NW)
         self.canvas.bind("<1>", self.left_click)
@@ -54,120 +53,28 @@ class Game:
         if square.seen != ' ':
             if self.check_full(row, col):
                 self.reveal_neighbors(row, col)
-            return
-        if not self.filled:
+        elif not self.filled:
             self.fill_board(row, col)
             self.set_nums()
             self.filled = True
-        if square.real == -1:
-            self.show_mines()
-        elif square.real == 0:
-            self.neighbours(row, col)
-        else:
-            self.reveal(row, col)
+        self.reveal(row, col)
         self.check_over()
 
+    # Checks if user has flagged enough mines adjacent to the square
     def check_full(self, row, col):
         num_flags = 0
-        # Check up
-        if row > 0 and self.board[row - 1][col].flagged:
-            num_flags += 1
-        # Check down
-        if row < self.height - 1 and self.board[row + 1][col].flagged:
-            num_flags += 1
-        # Check left
-        if col > 0 and self.board[row][col - 1].flagged:
-            num_flags += 1
-        # Check right
-        if col < self.width - 1 and self.board[row][col + 1].flagged:
-            num_flags += 1
-        # Check top-left
-        if row > 0 and col > 0 and self.board[row - 1][col - 1].flagged:
-            num_flags += 1
-        # Check top-right
-        if row > 0 and col < self.width - 1 and self.board[row - 1][col + 1].flagged:
-            num_flags += 1
-        # Check below-left
-        if row < self.height - 1 and col > 0 and self.board[row + 1][col - 1].flagged:
-            num_flags += 1
-        # Check below-right
-        if row < self.height - 1 and col < self.width - 1 and self.board[row + 1][col + 1].flagged:
-            num_flags += 1
+        neighbours = self.get_neighbours(row, col)
+        for neighbour in neighbours:
+            if neighbour.flagged:
+                num_flags += 1
 
         return num_flags == self.board[row][col].real
 
+    # Reveals neighbors
     def reveal_neighbors(self, row, col):
-        if row > 0:
-            if self.board[row - 1][col].real == 0:
-                self.neighbours(row - 1, col)
-            elif self.board[row - 1][col].real == -1:
-                if not self.board[row - 1][col].flagged:
-                    self.show_mines()
-            else:
-                self.reveal(row - 1, col)
-        # Check down
-        if row < self.height - 1:
-            if self.board[row + 1][col].real == 0:
-                self.neighbours(row + 1, col)
-            elif self.board[row + 1][col].real == -1:
-                if not self.board[row + 1][col].flagged:
-                    self.show_mines()
-            else:
-                self.reveal(row + 1, col)
-        # Check left
-        if col > 0:
-            if self.board[row][col - 1].real == 0:
-                self.neighbours(row, col - 1)
-            elif self.board[row][col - 1].real == -1:
-                if not self.board[row][col - 1].flagged:
-                    self.show_mines()
-            else:
-                self.reveal(row, col - 1)
-        # Check right
-        if col < self.width - 1:
-            if self.board[row][col + 1].real == 0:
-                self.neighbours(row, col + 1)
-            elif self.board[row][col + 1].real == -1:
-                if not self.board[row][col + 1].flagged:
-                    self.show_mines()
-            else:
-                self.reveal(row, col + 1)
-        # Check top-left
-        if row > 0 and col > 0:
-            if self.board[row - 1][col - 1].real == 0:
-                self.neighbours(row - 1, col - 1)
-            elif self.board[row - 1][col - 1].real == -1:
-                if not self.board[row - 1][col - 1].flagged:
-                    self.show_mines()
-            else:
-                self.reveal(row - 1, col - 1)
-        # Check top-right
-        if row > 0 and col < self.width - 1:
-            if self.board[row - 1][col + 1].real == 0:
-                self.neighbours(row - 1, col + 1)
-            elif self.board[row - 1][col + 1].real == -1:
-                if not self.board[row - 1][col + 1].flagged:
-                    self.show_mines()
-            else:
-                self.reveal(row - 1, col + 1)
-        # Check below-left
-        if row < self.height - 1 and col > 0:
-            if self.board[row + 1][col - 1].real == 0:
-                self.neighbours(row + 1, col - 1)
-            elif self.board[row + 1][col - 1].real == -1:
-                if not self.board[row + 1][col - 1].flagged:
-                    self.show_mines()
-            else:
-                self.reveal(row + 1, col - 1)
-        # Check below-right
-        if row < self.height - 1 and col < self.width - 1:
-            if self.board[row + 1][col + 1].real == 0:
-                self.neighbours(row + 1, col + 1)
-            elif self.board[row + 1][col + 1].real == -1:
-                if not self.board[row + 1][col + 1].flagged:
-                    self.show_mines()
-            else:
-                self.reveal(row + 1, col + 1)
+        neighbours = self.get_neighbours(row, col)
+        for neighbour in neighbours:
+            self.reveal(neighbour.row, neighbour.col)
 
     def right_click(self, row, col):
         if self.game_over:
@@ -187,7 +94,14 @@ class Game:
             self.set_seen(row, col, 'f')
 
     def reveal(self, row, col):
-        self.set_seen(row, col, self.board[row][col].real)
+        square = self.board[row][col]
+        if square.real == 0:
+            self.neighbours(row, col)
+        elif square.real == -1:
+            if not square.flagged:
+                self.show_mines()
+        else:
+            self.set_seen(row, col, square.real)
 
     def set_seen(self, row, col, value):
         square = self.board[row][col]
@@ -247,30 +161,10 @@ class Game:
                 if self.board[row][col].real == -1:
                     continue
 
-                # Check up
-                if row > 0 and self.board[row - 1][col].real == -1:
-                    self.board[row][col].real += 1
-                # Check down
-                if row < self.height - 1 and self.board[row + 1][col].real == -1:
-                    self.board[row][col].real += 1
-                # Check left
-                if col > 0 and self.board[row][col - 1].real == -1:
-                    self.board[row][col].real += 1
-                # Check right
-                if col < self.width - 1 and self.board[row][col + 1].real == -1:
-                    self.board[row][col].real += 1
-                # Check top-left
-                if row > 0 and col > 0 and self.board[row - 1][col - 1].real == -1:
-                    self.board[row][col].real += 1
-                # Check top-right
-                if row > 0 and col < self.width - 1 and self.board[row - 1][col + 1].real == -1:
-                    self.board[row][col].real += 1
-                # Check below-left
-                if row < self.height - 1 and col > 0 and self.board[row + 1][col - 1].real == -1:
-                    self.board[row][col].real += 1
-                # Check below-right
-                if row < self.height - 1 and col < self.width - 1 and self.board[row + 1][col + 1].real == -1:
-                    self.board[row][col].real += 1
+                neighbours = self.get_neighbours(row, col)
+                for neighbour in neighbours:
+                    if neighbour.real == -1:
+                        self.board[row][col].real += 1
 
     def neighbours(self, row, col):
         # If cell already not visited
@@ -282,7 +176,7 @@ class Game:
             # If cell is zero
             if self.board[row][col].real == 0:
                 # Display it to user
-                self.reveal(row, col)
+                self.set_seen(row, col, 0)
 
                 # Recursive call on neighbors
                 if row > 0:
@@ -329,7 +223,7 @@ class Game:
         for row in range(self.height):
             for col in range(self.width):
                 if self.board[row][col].real == -1:
-                    self.reveal(row, col)
+                    self.set_seen(row, col, -1)
 
     def build_gui(self):
         window.columnconfigure([x for x in range(self.width)], minsize=25)
@@ -338,43 +232,6 @@ class Game:
         for row in range(self.height):
             for col in range(self.width):
                 self.board[row][col].canvas.grid(row=row, column=col)
-
-
-def print_mines_layout():
-    global mine_values
-    global n
-
-    print()
-    print("\t\t\tMINESWEEPER\n")
-
-    st = "   "
-    for i in range(n):
-        st = st + "     " + str(i + 1)
-    print(st)
-
-    for r in range(n):
-        st = "     "
-        if r == 0:
-            for col in range(n):
-                st = st + "______"
-            print(st)
-
-        st = "     "
-        for col in range(n):
-            st = st + "|     "
-        print(st + "|")
-
-        st = "  " + str(r + 1) + "  "
-        for col in range(n):
-            st = st + "|  " + str(mine_values[r][col]) + "  "
-        print(st + "|")
-
-        st = "     "
-        for col in range(n):
-            st = st + "|_____"
-        print(st + '|')
-
-    print()
 
 
 # Referenced https://stackoverflow.com/questions/53861528/runtimeerror-too-early-to-create-image/53861790
