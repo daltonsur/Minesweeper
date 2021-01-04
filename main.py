@@ -1,5 +1,4 @@
 import random
-import sys
 import tkinter as tk
 
 
@@ -11,7 +10,7 @@ class Square:
         self.row = row
         self.col = col
         self.game = parent_game
-        self.canvas = tk.Canvas(window, width=25, height=25)
+        self.canvas = tk.Canvas(master=game_frame, width=25, height=25)
         self.canvas.create_image(0, 0, image=get(' '), anchor=tk.NW)
         self.canvas.bind("<1>", self.left_click)
         self.canvas.bind("<3>", self.right_click)
@@ -226,8 +225,8 @@ class Game:
                     self.set_seen(row, col, -1)
 
     def build_gui(self):
-        window.columnconfigure([x for x in range(self.width)], minsize=25)
-        window.rowconfigure([y for y in range(self.height)], minsize=25)
+        game_frame.columnconfigure([x for x in range(self.width)], minsize=25)
+        game_frame.rowconfigure([y for y in range(self.height)], minsize=25)
 
         for row in range(self.height):
             for col in range(self.width):
@@ -235,7 +234,7 @@ class Game:
 
 
 # Referenced https://stackoverflow.com/questions/53861528/runtimeerror-too-early-to-create-image/53861790
-imagelist = {
+image_list = {
     0: ['images/0.png', None],
     1: ['images/1.png', None],
     2: ['images/2.png', None],
@@ -252,29 +251,44 @@ imagelist = {
 
 
 def get(name):
-    if name in imagelist:
-        if imagelist[name][1] is None:
-            imagelist[name][1] = tk.PhotoImage(file=imagelist[name][0])
-        return imagelist[name][1]
+    if name in image_list:
+        if image_list[name][1] is None:
+            image_list[name][1] = tk.PhotoImage(file=image_list[name][0])
+        return image_list[name][1]
     return None
+
+
+def new_game(event):
+    global game_frame
+    global game
+
+    game_frame.destroy()
+    game_frame = tk.Frame(master=window)
+    game_frame.pack()
+    game = Game(difficulty.get())
+    game.build_gui()
 
 
 if __name__ == '__main__':
 
-    if len(sys.argv) == 2:
-        if sys.argv[1] != 'Beginner' and sys.argv[1] != 'Intermediate' and sys.argv[1] != 'Expert':
-            print("Invalid Input")
-            sys.exit()
-        diff = sys.argv[1]
-    else:
-        print("Invalid Input")
-        sys.exit()
-
     window = tk.Tk()
     window.resizable(False, False)
 
-    game = Game(diff)
+    control_frame = tk.Frame(master=window)
+    control_frame.pack()
+    new_game_button = tk.Button(master=control_frame, text="New Game", width=10, height=3)
+    new_game_button.pack()
+    new_game_button.bind("<1>", new_game)
+    difficulties = ["Beginner", "Intermediate", "Expert"]
+    difficulty = tk.StringVar(control_frame)
+    difficulty.set(difficulties[2])
+    diff_menu = tk.OptionMenu(control_frame, difficulty, *difficulties)
+    diff_menu.pack()
 
+    game_frame = tk.Frame(master=window)
+    game_frame.pack()
+
+    game = Game(difficulty.get())
     game.build_gui()
 
     window.mainloop()
