@@ -2,142 +2,192 @@ import random
 import tkinter as tk
 import time
 import math
+from queue import Queue
 
 
 class Square:
-    def __init__(self, row, col, parent_game):
-        self.row = row
-        self.col = col
-        self.game = parent_game
-        self.seen = ' '
-        self.real = 0
-        self.flagged = False
-        self.canvas = tk.Canvas(master=game_frame, width=25, height=25)
-        self.canvas.create_image(0, 0, image=get(' '), anchor=tk.NW)
-        self.canvas.bind("<1>", self.left_click)
-        self.canvas.bind("<3>", self.right_click)
+    def __init__(self, row, col):
+        self._row = row
+        self._col = col
+        self._seen_value = ''
+        self._real_value = 0
+        self._canvas = tk.Canvas(master=game_frame, width=25, height=25)
+        self._canvas.create_image(0, 0, image=get(''), anchor=tk.NW)
+        self.bind_left_click()
+
+    @property
+    def row(self):
+        return self._row
+
+    @property
+    def col(self):
+        return self._col
+
+    def reveal(self):
+        self.set_seen(self._real_value)
+        self.unbind_right_click()
+
+    def set_seen(self, value):
+        self._seen_value = value
+        self._canvas.create_image(0, 0, image=get(value), anchor=tk.NW)
+
+    def is_flagged(self):
+        return self._seen_value == 'f'
+
+    def is_revealed(self):
+        return self._seen_value != '' and self._seen_value != 'f'
+
+    def is_mine(self):
+        return self._real_value == -1
+
+    def is_empty(self):
+        return self._real_value == 0
+
+    def set_as_mine(self):
+        self._real_value = -1
+
+    def set_real(self, value):
+        self._real_value = value
+
+    def bind(self):
+        self.bind_right_click()
+        self.bind_left_click()
+
+    def bind_right_click(self):
+        self._canvas.bind("<3>", self.right_click)
+
+    def bind_left_click(self):
+        self._canvas.bind("<1>", self.left_click)
+
+    def unbind(self):
+        self.unbind_right_click()
+        self.unbind_left_click()
+
+    def unbind_right_click(self):
+        self._canvas.unbind("<3>")
+
+    def unbind_left_click(self):
+        self._canvas.unbind("<1>")
 
     def left_click(self, event):
-        self.game.left_click(self.row, self.col)
+        game.left_click(self)
 
     def right_click(self, event):
-        self.game.right_click(self.row, self.col)
+        game.right_click(self)
+
+    def is_fully_flagged(self):
+        return game.num_neighbors_flagged(self) == self._real_value
+
+    def remove_flag(self):
+        self.set_seen('')
+        self.bind_left_click()
+
+    def flag(self):
+        self.set_seen('f')
+        self.unbind_left_click()
+
+    def place_in_grid(self):
+        self._canvas.grid(row=self.row, column=self.col)
 
 
 class Game:
     def __init__(self, diff):
 
-        # Set difficulty
-        self.difficulty = diff
-        if self.difficulty == "Beginner":
-            self.height = 9
-            self.width = 9
-            self.num_mines = 10
-        elif self.difficulty == "Intermediate":
-            self.height = 16
-            self.width = 16
-            self.num_mines = 40
-        elif self.difficulty == "Expert":
-            self.height = 16
-            self.width = 30
-            self.num_mines = 99
-
         # instantiate board
-        self.board = [[Square(row, col, self) for col in range(self.width)] for row in range(self.height)]
+        self._num_mines = 0
+        height, width = self.set_difficulty(diff)
+        self._board = [[Square(row, col) for col in range(width)] for row in range(height)]
 
-        self.filled = False
-        self.vis = []
-        self.flags = 0
-        self.game_over = False
+        self._started = False
+        self._vis = []
+        self._flags = 0
+        self.start_time = None
+        self.timer_job = None
 
-    def left_click(self, row, col):
-        # If game is over, do nothing
-        if self.game_over:
-            return
+    def set_difficulty(self, diff):
+        if diff == "Beginner":
+            self._num_mines = 10
+            return 9, 9
+        elif diff == "Intermediate":
+            self._num_mines = 40
+            return 16, 16
+        else:
+            self._num_mines = 99
+            return 16, 30
 
-        square = self.board[row][col]
+    @property
+    def height(self):
+        return len(self._board)
 
-        # If square is flagged, do nothing
-        if square.flagged:
-            return
+    @property
+    def width(self):
+        return len(self._board[0])
 
-        # If square is revealed, reveal neighbors if fully flagged
-        if square.seen != ' ':
-            if self.check_full(row, col):
-                self.reveal_neighbors(row, col)
-
+    def left_click(self, square):
         # Fill board if haven't already
-        elif not self.filled:
-            self.fill_board(row, col)
-            self.set_nums()
-            self.filled = True
-            self.game_time = time.time()
-            self.update_clock()
-        self.reveal(row, col)
-        self.check_over()
+        if not self.is_started():
+            self.start_game(square)
 
-    # Checks if user has flagged enough mines adjacent to the square
-    def check_full(self, row, col):
-        num_flags = 0
-        neighbours = self.get_neighbours(row, col)
-        for neighbour in neighbours:
-            if neighbour.flagged:
-                num_flags += 1
+        if square.is_mine():
+            self.set_game_over(False)
+        else:
+            if square.is_revealed() and square.is_fully_flagged():
+                self.reveal_neighbors(square)
+            else:
+                self.reveal(square)
+            if self.is_over():
+                self.set_game_over(True)
 
-        return num_flags == self.board[row][col].real
+    def is_started(self):
+        return self._started
+
+    def start_game(self, square):
+        self.fill_board(square)
+        self.set_nums()
+        self.start_timer()
+        self.bind_all_right()
+        self._started = True
 
     # Reveals neighbors
-    def reveal_neighbors(self, row, col):
-        neighbours = self.get_neighbours(row, col)
-        for neighbour in neighbours:
-            self.reveal(neighbour.row, neighbour.col)
+    def reveal_neighbors(self, square):
+        neighbors = self.get_neighbors(square)
+        for neighbor in neighbors:
+            if not neighbor.is_revealed() and not neighbor.is_flagged():
+                self.reveal(neighbor)
 
-    def right_click(self, row, col):
-        # If game is over, do nothing
-        if self.game_over:
-            return
-        square = self.board[row][col]
-        # If game hasn't started, do nothing
-        if not self.filled:
-            return
-        # If already flagged, remove flag
-        if square.flagged:
-            square.flagged = False
-            self.flags -= 1
-            mines_label["text"] = str(self.num_mines - self.flags)
-            self.set_seen(row, col, ' ')
-        # If square is already revealed, do nothing
-        elif square.seen != ' ':
-            return
-        # If you haven't flagged too many, flag the square
-        elif self.flags < self.num_mines:
-            square.flagged = True
-            self.flags += 1
-            mines_label["text"] = str(self.num_mines - self.flags)
-            self.set_seen(row, col, 'f')
+    def set_game_over(self, won):
+        self.unbind_squares()
+        self.reveal_all_mines()
+        self.stop_timer()
 
     # Reveal a square
-    def reveal(self, row, col):
-        square = self.board[row][col]
-        # If empty space, reveal neighbours
-        if square.real == 0:
-            self.neighbours(row, col)
+    def reveal(self, square):
+        # If empty space, reveal neighbors
+        if square.is_empty():
+            self.reveal_empty(square)
         # If mine and not flagged, game over
-        elif square.real == -1:
-            if not square.flagged:
-                self.show_mines()
+        elif square.is_mine() and not square.is_flagged():
+            self.set_game_over(False)
         else:
-            self.set_seen(row, col, square.real)
+            square.reveal()
 
-    def set_seen(self, row, col, value):
-        square = self.board[row][col]
-        square.seen = value
-        square.canvas.create_image(0, 0, image=get(value), anchor=tk.NW)
-
-    def fill_board(self, row, col):
-        # Track of number of mines already set up
+    def is_over(self):
         count = 0
-        while count < self.num_mines:
+
+        # Check each cell
+        for row in self._board:
+            for square in row:
+                # If cell not empty or flagged
+                if square.is_revealed():
+                    count += 1
+
+        # Count comparison
+        return count == self.width * self.height - self._num_mines
+
+    def fill_board(self, square):
+        # Track of number of mines already set up
+        num_mines_placed = 0
+        while num_mines_placed < self._num_mines:
 
             # Random number from all possible grid positions
             val = random.randint(0, self.width * self.height - 1)
@@ -146,118 +196,123 @@ class Game:
             r = val // self.width
             c = val % self.width
 
-            # Place the mine, if it doesn't already have one
-            if row + 1 >= r >= row - 1 and col + 1 >= c >= c - 1:
+            # Place the mine, avoiding area around clicked square
+            if (square.row + 1 >= r >= square.row - 1
+                    and square.col + 1 >= c >= square.col - 1):
                 continue
-            elif self.board[r][c].real != -1:
-                count += 1
-                self.board[r][c].real = -1
-
-    def get_neighbours(self, row, col):
-        neighbours = []
-        if row > 0:
-            neighbours.append(self.board[row - 1][col])
-        # Check down
-        if row < self.height - 1:
-            neighbours.append(self.board[row + 1][col])
-        # Check left
-        if col > 0:
-            neighbours.append(self.board[row][col - 1])
-        # Check right
-        if col < self.width - 1:
-            neighbours.append(self.board[row][col + 1])
-        # Check top-left
-        if row > 0 and col > 0:
-            neighbours.append(self.board[row - 1][col - 1])
-        # Check top-right
-        if row > 0 and col < self.width - 1:
-            neighbours.append(self.board[row - 1][col + 1])
-        # Check below-left
-        if row < self.height - 1 and col > 0:
-            neighbours.append(self.board[row + 1][col - 1])
-        # Check below-right
-        if row < self.height - 1 and col < self.width - 1:
-            neighbours.append(self.board[row + 1][col + 1])
-        return neighbours
+            elif not self._board[r][c].is_mine():
+                num_mines_placed += 1
+                self._board[r][c].set_as_mine()
 
     def set_nums(self):
-        for row in range(self.height):
-            for col in range(self.width):
-
-                if self.board[row][col].real == -1:
+        for row in self._board:
+            for square in row:
+                if square.is_mine():
                     continue
 
-                neighbours = self.get_neighbours(row, col)
-                for neighbour in neighbours:
-                    if neighbour.real == -1:
-                        self.board[row][col].real += 1
+                neighbors = self.get_neighbors(square)
+                num_mine_neighbors = 0
+                for neighbor in neighbors:
+                    if neighbor.is_mine():
+                        num_mine_neighbors += 1
+                square.set_real(num_mine_neighbors)
 
-    def neighbours(self, row, col):
-        # If cell already not visited
-        if [row, col] not in self.vis:
+    def start_timer(self):
+        self.start_time = time.time()
+        time_label["text"] = '0'
+        self.timer_job = window.after(1000, self.update_timer)
 
-            # Mark cell visited
-            self.vis.append([row, col])
+    def bind_all_right(self):
+        for row in self._board:
+            for square in row:
+                square.bind_right_click()
 
-            # If cell is zero
-            if self.board[row][col].real == 0:
-                # Display it to user
-                self.set_seen(row, col, 0)
+    def get_neighbors(self, square):
+        neighbors = []
 
-                # Recursive call on neighbors
-                if row > 0:
-                    self.neighbours(row - 1, col)
-                if row < self.height - 1:
-                    self.neighbours(row + 1, col)
-                if col > 0:
-                    self.neighbours(row, col - 1)
-                if col < self.width - 1:
-                    self.neighbours(row, col + 1)
-                if row > 0 and col > 0:
-                    self.neighbours(row - 1, col - 1)
-                if row > 0 and col < self.width - 1:
-                    self.neighbours(row - 1, col + 1)
-                if row < self.height - 1 and col > 0:
-                    self.neighbours(row + 1, col - 1)
-                if row < self.height - 1 and col < self.width - 1:
-                    self.neighbours(row + 1, col + 1)
+        for row in range(max(0, square.row - 1), min(self.height, square.row + 2)):
+            for col in range(max(0, square.col - 1), min(self.width, square.col + 2)):
+                if row == square.row and col == square.col:
+                    continue
+                neighbors.append(self._board[row][col])
 
-            # If cell not zero
-            if self.board[row][col].real != 0:
-                self.reveal(row, col)
+        return neighbors
 
-    def check_over(self):
-        count = 0
+    def unbind_squares(self):
+        for row in self._board:
+            for square in row:
+                square.unbind()
 
-        # Check each cell
-        for row in range(self.height):
-            for col in range(self.width):
+    def reveal_all_mines(self):
+        for row in self._board:
+            for square in row:
+                if square.is_mine():
+                    square.reveal()
 
-                # If cell not empty or flagged
-                if self.board[row][col].seen != ' ' and not self.board[row][col].flagged:
-                    count += 1
-
-        # Count comparison
-        if count == self.width * self.height - self.num_mines:
-            self.show_mines()
-            self.game_over = True
-        else:
-            return False
-
-    def show_mines(self):
-        self.game_over = True
+    def stop_timer(self):
         window.after_cancel(self.timer_job)
-        for row in range(self.height):
-            for col in range(self.width):
-                if self.board[row][col].real == -1:
-                    self.set_seen(row, col, -1)
+
+    def reveal_empty(self, square):
+        # If cell already not visited
+        vis = set()
+        queue = Queue(maxsize=self.height * self.width)
+        queue.put(square)
+        while not queue.empty():
+            curr = queue.get()
+            curr.reveal()
+            vis.add(curr)
+            neighbors = self.get_neighbors(curr)
+            for neighbor in neighbors:
+                if neighbor in vis or neighbor.is_flagged():
+                    continue
+                elif neighbor.is_empty():
+                    queue.put(neighbor)
+                else:
+                    vis.add(neighbor)
+                    neighbor.reveal()
+
+    def update_timer(self):
+        time_label["text"] = str(math.floor(time.time() - self.start_time))
+        self.timer_job = window.after(1000, self.update_timer)
+
+    def right_click(self, square):
+        # If already flagged, remove flag
+        if square.is_flagged():
+            self.remove_flag(square)
+        # If square is already revealed, do nothing
+        elif square.is_revealed():
+            return
+        # If you haven't flagged too many, flag the square
+        elif self._flags < self._num_mines:
+            self.add_flag(square)
+
+    def remove_flag(self, square):
+        square.remove_flag()
+        self._flags -= 1
+        self.set_mine_label()
+
+    def add_flag(self, square):
+        square.flag()
+        self._flags += 1
+        self.set_mine_label()
+
+    def set_mine_label(self):
+        mines_label["text"] = str(self._num_mines - self._flags)
+
+    def num_neighbors_flagged(self, square):
+        num_flags = 0
+        neighbors = self.get_neighbors(square)
+        for neighbor in neighbors:
+            if neighbor.is_flagged():
+                num_flags += 1
+        return num_flags
 
     def build_gui(self):
         global mines_label
         global time_label
 
         # Build the mines label
-        mines_label = tk.Label(master=control_frame, text=str(self.num_mines))
+        mines_label = tk.Label(master=control_frame, text=str(self._num_mines))
         mines_label.config(font=("Impact", 44))
         mines_label.pack()
 
@@ -271,11 +326,11 @@ class Game:
 
         for row in range(self.height):
             for col in range(self.width):
-                self.board[row][col].canvas.grid(row=row, column=col)
+                self._board[row][col].place_in_grid()
 
-    def update_clock(self):
-        time_label["text"] = str(math.floor(time.time() - self.game_time))
-        self.timer_job = window.after(1000, self.update_clock)
+
+
+
 
 
 # Referenced https://stackoverflow.com/questions/53861528/runtimeerror-too-early-to-create-image/53861790
@@ -291,7 +346,7 @@ image_list = {
     8: ['images/8.png', None],
     -1: ['images/bomb.png', None],
     'f': ['images/flagged.png', None],
-    ' ': ['images/facingDown.png', None],
+    '': ['images/facingDown.png', None],
 }
 
 
@@ -339,7 +394,7 @@ if __name__ == '__main__':
     game_frame = tk.Frame(master=window)
     game_frame.pack()
 
-    game = Game(difficulty.get())
+    game = Game("Expert")
     game.build_gui()
 
     window.mainloop()
