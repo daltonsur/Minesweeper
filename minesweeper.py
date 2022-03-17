@@ -6,7 +6,7 @@ from queue import Queue
 
 
 class Square:
-    def __init__(self, row: int, col: int):
+    def __init__(self, row, col):
         self._row = row
         self._col = col
         self._seen_value = ''
@@ -91,14 +91,12 @@ class Square:
 
 
 class Game:
-    def __init__(self, diff: str):
+    def __init__(self, diff):
 
         # instantiate board
-
         self._num_mines = 0
-        self.height, self.width = self.set_difficulty(diff)
-        self.build_gui()
-        self._board = [[Square(row, col) for col in range(self.width)] for row in range(self.height)]
+        height, width = self.set_difficulty(diff)
+        self._board = [[Square(row, col) for col in range(width)] for row in range(height)]
 
         self._started = False
         self._vis = []
@@ -106,7 +104,7 @@ class Game:
         self.start_time = None
         self.timer_job = None
 
-    def set_difficulty(self, diff: str):
+    def set_difficulty(self, diff):
         if diff == "Beginner":
             self._num_mines = 10
             return 9, 9
@@ -117,7 +115,15 @@ class Game:
             self._num_mines = 99
             return 16, 30
 
-    def left_click(self, square: Square):
+    @property
+    def height(self):
+        return len(self._board)
+
+    @property
+    def width(self):
+        return len(self._board[0])
+
+    def left_click(self, square):
         # Fill board if haven't already
         if not self.is_started():
             self.start_game(square)
@@ -135,7 +141,7 @@ class Game:
     def is_started(self):
         return self._started
 
-    def start_game(self, square: Square):
+    def start_game(self, square):
         self.fill_board(square)
         self.set_nums()
         self.start_timer()
@@ -143,19 +149,19 @@ class Game:
         self._started = True
 
     # Reveals neighbors
-    def reveal_neighbors(self, square: Square):
+    def reveal_neighbors(self, square):
         neighbors = self.get_neighbors(square)
         for neighbor in neighbors:
             if not neighbor.is_revealed() and not neighbor.is_flagged():
                 self.reveal(neighbor)
 
-    def set_game_over(self, won: bool):
+    def set_game_over(self, won):
         self.unbind_squares()
         self.reveal_all_mines()
         self.stop_timer()
 
     # Reveal a square
-    def reveal(self, square: Square):
+    def reveal(self, square):
         # If empty space, reveal neighbors
         if square.is_empty():
             self.reveal_empty(square)
@@ -178,14 +184,13 @@ class Game:
         # Count comparison
         return count == self.width * self.height - self._num_mines
 
-    def fill_board(self, square: Square):
+    def fill_board(self, square):
         # Track of number of mines already set up
         num_mines_placed = 0
         while num_mines_placed < self._num_mines:
 
             # Random number from all possible grid positions
             val = random.randint(0, self.width * self.height - 1)
-
             # Generating row and column from the number
             r = val // self.width
             c = val % self.width
@@ -221,7 +226,7 @@ class Game:
             for square in row:
                 square.bind_right_click()
 
-    def get_neighbors(self, square: Square):
+    def get_neighbors(self, square):
         neighbors = []
 
         for row in range(max(0, square.row - 1), min(self.height, square.row + 2)):
@@ -246,7 +251,7 @@ class Game:
     def stop_timer(self):
         window.after_cancel(self.timer_job)
 
-    def reveal_empty(self, square: Square):
+    def reveal_empty(self, square):
         # If cell already not visited
         vis = set()
         queue = Queue(maxsize=self.height * self.width)
@@ -269,7 +274,7 @@ class Game:
         time_label["text"] = str(math.floor(time.time() - self.start_time))
         self.timer_job = window.after(1000, self.update_timer)
 
-    def right_click(self, square: Square):
+    def right_click(self, square):
         # If already flagged, remove flag
         if square.is_flagged():
             self.remove_flag(square)
@@ -280,12 +285,12 @@ class Game:
         elif self._flags < self._num_mines:
             self.add_flag(square)
 
-    def remove_flag(self, square: Square):
+    def remove_flag(self, square):
         square.remove_flag()
         self._flags -= 1
         self.set_mine_label()
 
-    def add_flag(self, square: Square):
+    def add_flag(self, square):
         square.flag()
         self._flags += 1
         self.set_mine_label()
@@ -293,7 +298,7 @@ class Game:
     def set_mine_label(self):
         mines_label["text"] = str(self._num_mines - self._flags)
 
-    def num_neighbors_flagged(self, square: Square):
+    def num_neighbors_flagged(self, square):
         num_flags = 0
         neighbors = self.get_neighbors(square)
         for neighbor in neighbors:
@@ -302,33 +307,8 @@ class Game:
         return num_flags
 
     def build_gui(self):
-        global window
-        global control_frame
-        global new_game_button
-        global diff_menu
-        global game_frame
         global mines_label
         global time_label
-        global difficulty
-
-        window = tk.Tk()
-        window.resizable(False, False)
-
-        control_frame = tk.Frame(master=window)
-        control_frame.pack()
-
-        new_game_button = tk.Button(master=control_frame, text="New Game", width=10, height=3)
-        new_game_button.pack()
-        new_game_button.bind("<1>", new_game)
-
-        difficulties = ["Beginner", "Intermediate", "Expert"]
-        difficulty = tk.StringVar(control_frame)
-        difficulty.set(difficulties[2])
-        diff_menu = tk.OptionMenu(control_frame, difficulty, *difficulties)
-        diff_menu.pack()
-
-        game_frame = tk.Frame(master=window)
-        game_frame.pack()
 
         # Build the mines label
         mines_label = tk.Label(master=control_frame, text=str(self._num_mines))
@@ -338,7 +318,6 @@ class Game:
         time_label = tk.Label(master=control_frame, text="000")
         time_label.config(font=("Impact", 44))
         time_label.pack()
-
         # Configure the mine grid
         game_frame.columnconfigure([x for x in range(self.width)], minsize=25)
         game_frame.rowconfigure([y for y in range(self.height)], minsize=25)
@@ -347,23 +326,21 @@ class Game:
             for col in range(self.width):
                 self._board[row][col].place_in_grid()
 
-        window.mainloop()
-
 
 # Referenced https://stackoverflow.com/questions/53861528/runtimeerror-too-early-to-create-image/53861790
 image_list = {
-    0: ['images/0.png', None],
-    1: ['images/1.png', None],
-    2: ['images/2.png', None],
-    3: ['images/3.png', None],
-    4: ['images/4.png', None],
-    5: ['images/5.png', None],
-    6: ['images/6.png', None],
-    7: ['images/7.png', None],
-    8: ['images/8.png', None],
+    0: ['images/zero.png', None],
+    1: ['images/one.png', None],
+    2: ['images/two.png', None],
+    3: ['images/three.png', None],
+    4: ['images/four.png', None],
+    5: ['images/five.png', None],
+    6: ['images/six.png', None],
+    7: ['images/seven.png', None],
+    8: ['images/eight.png', None],
     -1: ['images/bomb.png', None],
-    'f': ['images/flagged.png', None],
-    '': ['images/facingDown.png', None],
+    'f': ['images/flag.png', None],
+    '': ['images/empty.png', None],
 }
 
 
@@ -378,11 +355,9 @@ def get(name):
 def new_game(event):
     global game_frame
     global game
-
     mines_label.destroy()
     time_label.destroy()
     window.after_cancel(game.timer_job)
-
     game_frame.destroy()
     game_frame = tk.Frame(master=window)
     game_frame.pack()
@@ -391,4 +366,22 @@ def new_game(event):
 
 
 if __name__ == '__main__':
+    window = tk.Tk()
+    window.resizable(False, False)
+    control_frame = tk.Frame(master=window)
+    control_frame.pack()
+    new_game_button = tk.Button(master=control_frame, text="New Game", width=10, height=3)
+    new_game_button.pack()
+    new_game_button.bind("<1>", new_game)
+    difficulties = ["Beginner", "Intermediate", "Expert"]
+    difficulty = tk.StringVar(control_frame)
+    difficulty.set(difficulties[2])
+    diff_menu = tk.OptionMenu(control_frame, difficulty, *difficulties)
+    diff_menu.pack()
+    game_frame = tk.Frame(master=window)
+    game_frame.pack()
+
     game = Game("Expert")
+    game.build_gui()
+
+    window.mainloop()
