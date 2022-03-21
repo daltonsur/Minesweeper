@@ -60,9 +60,6 @@ class Cell:
     def is_empty(self) -> bool:
         return self._real_value is CellValue.ZERO
 
-    def set_as_mine(self) -> None:
-        self._real_value = CellValue.MINE
-
     def set_real(self, value: CellValue) -> None:
         self._real_value = value
 
@@ -217,7 +214,7 @@ class Game:
                 continue
             elif not self._board[r][c].is_mine():
                 num_mines_placed += 1
-                self._board[r][c].set_as_mine()
+                self._board[r][c].set_real(CellValue.MINE)
 
     def set_nums(self) -> None:
         for row in self._board:
