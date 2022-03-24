@@ -23,13 +23,16 @@ class CellValue(IntEnum):
 
 
 class Cell:
-    def __init__(self, row: int, col: int):
+    game = None
+
+    def __init__(self, row: int, col: int, parent):
         self._row = row
         self._col = col
         self._seen_value = CellValue.COVERED
         self._real_value = CellValue.ZERO
-        self._canvas = tk.Canvas(master=game_frame, width=25, height=25)
-        self._canvas.create_image(0, 0, image=get(self._seen_value), anchor=tk.NW)
+        self._canvas = tk.Canvas(parent, width=25, height=25)
+        self.set_seen(self._seen_value)
+        self.place_in_grid()
         self.bind_left_click()
 
     @property
@@ -84,13 +87,13 @@ class Cell:
         self._canvas.unbind("<1>")
 
     def left_click(self, event: tk.Event) -> None:
-        game.left_click(self)
+        self.game.left_click(self)
 
     def right_click(self, event: tk.Event) -> None:
-        game.right_click(self)
+        self.game.right_click(self)
 
     def is_fully_flagged(self) -> bool:
-        return game.num_neighbors_flagged(self) == self._real_value.value
+        return self.game.num_neighbors_flagged(self) == self._real_value.value
 
     def remove_flag(self) -> None:
         self.set_seen(CellValue.COVERED)
@@ -106,35 +109,43 @@ class Cell:
 
 class Game:
     def __init__(self, diff: str):
-        # instantiate board
         self._num_mines = 0
-        height, width = self.set_difficulty(diff)
-        self._board = [[Cell(row, col) for col in range(width)] for row in range(height)]
-
+        self._height = 0
+        self._width = 0
+        self._difficulty = None
+        self.set_difficulty(diff)
+        self.view = GameView(self)
+        Cell.game = self
+        self._board = [[Cell(row, col, self.view.game_frame) for col in range(self._width)]
+                       for row in range(self._height)]
         self._started = False
         self._vis = []
         self._flags = 0
-        self.start_time = None
-        self.timer_job = None
+        self.view.start_view()
 
     def set_difficulty(self, diff: str) -> [int, int]:
+        self._difficulty = diff
         if diff == "Beginner":
             self._num_mines = 10
-            return 9, 9
+            self._height, self._width = 9, 9
         elif diff == "Intermediate":
             self._num_mines = 40
-            return 16, 16
+            self._height, self._width = 16, 16
         else:
             self._num_mines = 99
-            return 16, 30
+            self._height, self._width = 16, 30
 
     @property
-    def height(self):
-        return len(self._board)
+    def height(self) -> int:
+        return self._height
 
     @property
-    def width(self):
-        return len(self._board[0])
+    def width(self) -> int:
+        return self._width
+
+    @property
+    def num_mines(self) -> int:
+        return self._num_mines
 
     def left_click(self, cell: Cell) -> None:
         # Fill board if haven't already
@@ -157,7 +168,7 @@ class Game:
     def start_game(self, cell: Cell) -> None:
         self.fill_board(cell)
         self.set_nums()
-        self.start_timer()
+        self.view.start_timer()
         self.bind_all_right()
         self._started = True
 
@@ -171,7 +182,7 @@ class Game:
     def set_game_over(self) -> None:
         self.unbind_cells()
         self.reveal_all_mines()
-        self.stop_timer()
+        self.view.stop_timer()
 
     # Reveal a cell
     def reveal(self, cell: Cell) -> None:
@@ -195,7 +206,7 @@ class Game:
                     count += 1
 
         # Count comparison
-        return count == self.width * self.height - self._num_mines
+        return count == self._width * self._height - self._num_mines
 
     def fill_board(self, cell: Cell) -> None:
         # Track of number of mines already set up
@@ -203,10 +214,10 @@ class Game:
         while num_mines_placed < self._num_mines:
 
             # Random number from all possible grid positions
-            val = random.randint(0, self.width * self.height - 1)
+            val = random.randint(0, self._width * self._height - 1)
             # Generating row and column from the number
-            r = val // self.width
-            c = val % self.width
+            r = val // self._width
+            c = val % self._width
 
             # Place the mine, avoiding area around clicked cell
             if (cell.row + 1 >= r >= cell.row - 1
@@ -229,11 +240,6 @@ class Game:
                         num_mine_neighbors += 1
                 cell.set_real(CellValue(num_mine_neighbors))
 
-    def start_timer(self) -> None:
-        self.start_time = time.time()
-        time_label["text"] = '0'
-        self.timer_job = window.after(1000, self.update_timer)
-
     def bind_all_right(self) -> None:
         for row in self._board:
             for cell in row:
@@ -242,8 +248,8 @@ class Game:
     def get_neighbors(self, cell: Cell) -> List[Cell]:
         neighbors = []
 
-        for row in range(max(0, cell.row - 1), min(self.height, cell.row + 2)):
-            for col in range(max(0, cell.col - 1), min(self.width, cell.col + 2)):
+        for row in range(max(0, cell.row - 1), min(self._height, cell.row + 2)):
+            for col in range(max(0, cell.col - 1), min(self._width, cell.col + 2)):
                 if row == cell.row and col == cell.col:
                     continue
                 neighbors.append(self._board[row][col])
@@ -261,12 +267,9 @@ class Game:
                 if cell.is_mine():
                     cell.reveal()
 
-    def stop_timer(self) -> None:
-        window.after_cancel(self.timer_job)
-
     def reveal_empty(self, cell: Cell) -> None:
         vis = set()
-        queue = Queue(maxsize=self.height * self.width)
+        queue = Queue(maxsize=self._height * self._width)
         queue.put(cell)
         vis.add(cell)
         while not queue.empty():
@@ -283,10 +286,6 @@ class Game:
                     vis.add(neighbor)
                     neighbor.reveal()
 
-    def update_timer(self) -> None:
-        time_label["text"] = str(math.floor(time.time() - self.start_time))
-        self.timer_job = window.after(1000, self.update_timer)
-
     def right_click(self, cell: Cell) -> None:
         # If already flagged, remove flag
         if cell.is_flagged():
@@ -301,15 +300,12 @@ class Game:
     def remove_flag(self, cell: Cell) -> None:
         cell.remove_flag()
         self._flags -= 1
-        self.set_mine_label()
+        self.view.set_mines_label(self._num_mines - self._flags)
 
     def add_flag(self, cell: Cell) -> None:
         cell.flag()
         self._flags += 1
-        self.set_mine_label()
-
-    def set_mine_label(self) -> None:
-        mines_label["text"] = str(self._num_mines - self._flags)
+        self.view.set_mines_label(self._num_mines - self._flags)
 
     def num_neighbors_flagged(self, cell: Cell) -> int:
         num_flags = 0
@@ -319,25 +315,125 @@ class Game:
                 num_flags += 1
         return num_flags
 
-    def build_gui(self) -> None:
-        global mines_label
-        global time_label
+    def new_game(self, event: tk.Event) -> None:
+        self.view.stop_timer()
+        old_difficulty = self._difficulty
+        self.set_difficulty(self.view.get_difficulty())
+        if old_difficulty != self._difficulty:
+            self.view.resize_board()
+            self._board = [[Cell(row, col, self.view.game_frame) for col in range(self._width)]
+                           for row in range(self._height)]
+        else:
+            for row in self._board:
+                for cell in row:
+                    cell.set_real(CellValue.ZERO)
+                    cell.set_seen(CellValue.COVERED)
+                    cell.bind_left_click()
+        self._started = False
+        self._flags = 0
+        self._vis = []
+        self.view.reset_timer()
 
-        # Build the mines label
-        mines_label = tk.Label(master=control_frame, text=str(self._num_mines))
-        mines_label.config(font=("Impact", 44))
-        mines_label.pack()
 
-        time_label = tk.Label(master=control_frame, text="000")
-        time_label.config(font=("Impact", 44))
-        time_label.pack()
-        # Configure the mine grid
-        game_frame.columnconfigure([x for x in range(self.width)], minsize=25)
-        game_frame.rowconfigure([y for y in range(self.height)], minsize=25)
+class GameView:
+    def __init__(self, game: Game):
+        self.game = game
 
-        for row in range(self.height):
-            for col in range(self.width):
-                self._board[row][col].place_in_grid()
+        self.window = tk.Tk()
+        self.window.resizable(False, False)
+
+        self.control_frame = tk.Frame(self.window)
+        self.control_frame.pack()
+
+        self.diff_menu = DifficultyMenu(self.control_frame)
+        self.new_game_button = NewGameButton(self.control_frame, self.game.new_game)
+        self.mines_label = MinesLabel(self.control_frame, self.game.num_mines)
+        self.timer_label = TimerLabel(self.control_frame)
+
+        self.game_frame = GameBoardFrame(self.window, self.game.height, self.game.width)
+
+    def start_view(self):
+        self.window.mainloop()
+
+    def start_timer(self):
+        self.timer_label.start_timer()
+
+    def stop_timer(self):
+        self.timer_label.stop_timer()
+
+    def set_mines_label(self, value: int):
+        self.mines_label.set_mine_label(str(value))
+
+    def get_difficulty(self):
+        return self.diff_menu.get_difficulty()
+
+    def resize_board(self):
+        self.game_frame.resize(self.game.height, self.game.width)
+
+    def reset_timer(self):
+        self.timer_label.reset_timer()
+
+
+class DifficultyMenu(tk.OptionMenu):
+    def __init__(self, parent):
+        difficulties = ["Beginner", "Intermediate", "Expert"]
+        self.difficulty = tk.StringVar(value=difficulties[2])
+        super().__init__(parent, self.difficulty, *difficulties)
+        self.pack()
+
+    def get_difficulty(self):
+        return self.difficulty.get()
+
+
+class NewGameButton(tk.Button):
+    def __init__(self, parent, func):
+        super().__init__(parent, text="New Game", width=10, height=3)
+        self.bind("<1>", func)
+        self.pack()
+
+
+class TimerLabel(tk.Label):
+    def __init__(self, parent):
+        super().__init__(parent, font=("Impact", 44), text="00")
+        self.start_time = None
+        self.timer_job = None
+        self.pack()
+
+    def start_timer(self) -> None:
+        self.start_time = time.time()
+        self["text"] = "00"
+        self.timer_job = self.after(1000, self.update_timer)
+
+    def update_timer(self) -> None:
+        self["text"] = str(math.floor(time.time() - self.start_time))
+        self.timer_job = self.after(1000, self.update_timer)
+
+    def stop_timer(self) -> None:
+        self.after_cancel(self.timer_job)
+
+    def reset_timer(self):
+        self["text"] = "00"
+
+
+class MinesLabel(tk.Label):
+    def __init__(self, parent, num_mines):
+        super().__init__(parent, font=("Impact", 44), text=num_mines)
+        self.pack()
+
+    def set_mine_label(self, value: str) -> None:
+        self["text"] = value
+
+
+class GameBoardFrame(tk.Frame):
+    def __init__(self, parent, height, width):
+        super().__init__(parent)
+        self.columnconfigure([x for x in range(width)], minsize=25)
+        self.rowconfigure([y for y in range(height)], minsize=25)
+        self.pack()
+
+    def resize(self, height, width):
+        self.columnconfigure([x for x in range(width)], minsize=25)
+        self.rowconfigure([y for y in range(height)], minsize=25)
 
 
 # Referenced https://stackoverflow.com/questions/53861528/runtimeerror-too-early-to-create-image/53861790
@@ -364,36 +460,5 @@ def get(value: CellValue) -> tk.PhotoImage:
         return image_list[value][1]
 
 
-def new_game(event):
-    global game_frame
-    global game
-    mines_label.destroy()
-    time_label.destroy()
-    window.after_cancel(game.timer_job)
-    game_frame.destroy()
-    game_frame = tk.Frame(master=window)
-    game_frame.pack()
-    game = Game(difficulty.get())
-    game.build_gui()
-
-
 if __name__ == '__main__':
-    window = tk.Tk()
-    window.resizable(False, False)
-    control_frame = tk.Frame(master=window)
-    control_frame.pack()
-    new_game_button = tk.Button(master=control_frame, text="New Game", width=10, height=3)
-    new_game_button.pack()
-    new_game_button.bind("<1>", new_game)
-    difficulties = ["Beginner", "Intermediate", "Expert"]
-    difficulty = tk.StringVar(control_frame)
-    difficulty.set(difficulties[2])
-    diff_menu = tk.OptionMenu(control_frame, difficulty, *difficulties)
-    diff_menu.pack()
-    game_frame = tk.Frame(master=window)
-    game_frame.pack()
-
-    game = Game("Expert")
-    game.build_gui()
-
-    window.mainloop()
+    Game("Expert")
