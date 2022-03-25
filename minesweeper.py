@@ -49,7 +49,7 @@ class Cell:
 
     def set_seen(self, value: CellValue) -> None:
         self._seen_value = value
-        self._canvas.create_image(0, 0, image=get(value), anchor=tk.NW)
+        self._canvas.create_image(0, 0, image=BoardIcons.get(value), anchor=tk.NW)
 
     def is_flagged(self) -> bool:
         return self._seen_value is CellValue.FLAG
@@ -436,28 +436,29 @@ class GameBoardFrame(tk.Frame):
         self.rowconfigure([y for y in range(height)], minsize=25)
 
 
-# Referenced https://stackoverflow.com/questions/53861528/runtimeerror-too-early-to-create-image/53861790
-image_list: Dict[CellValue, list] = {
-    CellValue.ZERO: ['images/zero.png', None],
-    CellValue.ONE: ['images/one.png', None],
-    CellValue.TWO: ['images/two.png', None],
-    CellValue.THREE: ['images/three.png', None],
-    CellValue.FOUR: ['images/four.png', None],
-    CellValue.FIVE: ['images/five.png', None],
-    CellValue.SIX: ['images/six.png', None],
-    CellValue.SEVEN: ['images/seven.png', None],
-    CellValue.EIGHT: ['images/eight.png', None],
-    CellValue.MINE: ['images/mine.png', None],
-    CellValue.FLAG: ['images/flag.png', None],
-    CellValue.COVERED: ['images/covered.png', None],
-}
+class BoardIcons:
+    # Referenced https://stackoverflow.com/questions/53861528/runtimeerror-too-early-to-create-image/53861790
+    image_list: Dict[CellValue, list] = {
+        CellValue.ZERO: ['images/zero.png', None],
+        CellValue.ONE: ['images/one.png', None],
+        CellValue.TWO: ['images/two.png', None],
+        CellValue.THREE: ['images/three.png', None],
+        CellValue.FOUR: ['images/four.png', None],
+        CellValue.FIVE: ['images/five.png', None],
+        CellValue.SIX: ['images/six.png', None],
+        CellValue.SEVEN: ['images/seven.png', None],
+        CellValue.EIGHT: ['images/eight.png', None],
+        CellValue.MINE: ['images/mine.png', None],
+        CellValue.FLAG: ['images/flag.png', None],
+        CellValue.COVERED: ['images/covered.png', None],
+    }
 
-
-def get(value: CellValue) -> tk.PhotoImage:
-    if value in image_list:
-        if image_list[value][1] is None:
-            image_list[value][1] = tk.PhotoImage(file=image_list[value][0])
-        return image_list[value][1]
+    @classmethod
+    def get(cls, value: CellValue) -> tk.PhotoImage:
+        if value in cls.image_list:
+            if cls.image_list[value][1] is None:
+                cls.image_list[value][1] = tk.PhotoImage(file=cls.image_list[value][0])
+            return cls.image_list[value][1]
 
 
 if __name__ == '__main__':
