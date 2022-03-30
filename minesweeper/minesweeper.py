@@ -1,7 +1,7 @@
 import random
 import tkinter as tk
 import minesweeper_tkinter
-from enum import IntEnum
+from enum import IntEnum, auto
 from queue import Queue
 from typing import List, Dict
 
@@ -16,9 +16,9 @@ class CellValue(IntEnum):
     SIX = 6
     SEVEN = 7
     EIGHT = 8
-    FLAG = 9
-    COVERED = 10
-    MINE = 11
+    FLAG = auto()
+    COVERED = auto()
+    MINE = auto()
 
 
 class Cell:
