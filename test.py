@@ -1,11 +1,19 @@
 import unittest
-import minesweeper.minesweeper as ms
+from minesweeper.minesweeper import *
 
 
 class TestBoardIcons(unittest.TestCase):
-    def test_starts_uninitialized(self):
-        for elem in ms.BoardIcons._image_list.values():
-            self.assertIsNone(elem[1])
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tk.Tk()
+
+    def test_returns_image_for_all_possible_inputs(self):
+        for value in CellValue:
+            self.assertIsInstance(BoardIcons.get(value), tk.PhotoImage)
+
+    def test_returns_same_image_for_same_input(self):
+        self.assertEquals(BoardIcons.get(CellValue.ZERO),
+                          BoardIcons.get(CellValue.ZERO))
 
 
 if __name__ == '__main__':

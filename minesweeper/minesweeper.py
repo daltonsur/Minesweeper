@@ -463,6 +463,8 @@ class BoardIcons:
             if cls._image_list[value][1] is None:
                 cls._image_list[value][1] = tk.PhotoImage(file=cls._image_list[value][0])
             return cls._image_list[value][1]
+        else:
+            raise ValueError("Must pass in valid Cell Value.")
 
 
 if __name__ == '__main__':
