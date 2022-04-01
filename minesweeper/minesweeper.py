@@ -4,7 +4,7 @@ import time
 import tkinter as tk
 from enum import IntEnum, auto
 from queue import Queue
-from typing import List, Dict
+from typing import List
 
 
 class CellValue(IntEnum):
@@ -21,11 +21,20 @@ class CellValue(IntEnum):
     COVERED = auto()
     MINE = auto()
 
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self._image = None
+
+    @property
+    def image(self):
+        if self._image is None:
+            self._image = tk.PhotoImage(file=f"images/{self.name.lower()}.png")
+        return self._image
+
 
 class Cell:
-    game = None
-
-    def __init__(self, row: int, col: int, parent):
+    def __init__(self, game, row: int, col: int, parent):
+        self._game = game
         self._row = row
         self._col = col
         self._seen_value = CellValue.COVERED
@@ -49,7 +58,7 @@ class Cell:
 
     def set_seen(self, value: CellValue) -> None:
         self._seen_value = value
-        self._canvas.create_image(0, 0, image=BoardIcons.get(value), anchor=tk.NW)
+        self._canvas.create_image(0, 0, image=self._seen_value.image, anchor=tk.NW)
 
     def is_flagged(self) -> bool:
         return self._seen_value is CellValue.FLAG
@@ -87,13 +96,13 @@ class Cell:
         self._canvas.unbind("<1>")
 
     def left_click(self, event: tk.Event) -> None:
-        self.game.left_click(self)
+        self._game.left_click(self)
 
     def right_click(self, event: tk.Event) -> None:
-        self.game.right_click(self)
+        self._game.right_click(self)
 
     def is_fully_flagged(self) -> bool:
-        return self.game.num_neighbors_flagged(self) == self._real_value.value
+        return self._game.num_neighbors_flagged(self) == self._real_value.value
 
     def remove_flag(self) -> None:
         self.set_seen(CellValue.COVERED)
@@ -116,7 +125,7 @@ class Game:
         self.set_difficulty(diff)
         self.view = GameView(self)
         Cell.game = self
-        self._board = [[Cell(row, col, self.view.game_frame) for col in range(self._width)]
+        self._board = [[Cell(self, row, col, self.view.game_frame) for col in range(self._width)]
                        for row in range(self._height)]
         self._started = False
         self._vis = []
@@ -438,33 +447,6 @@ class GameBoardFrame(tk.Frame):
     def resize(self, height, width):
         self.columnconfigure(int(width - 1))
         self.rowconfigure(int(height - 1))
-
-
-class BoardIcons:
-    # Referenced https://stackoverflow.com/questions/53861528/runtimeerror-too-early-to-create-image/53861790
-    _image_list: Dict[CellValue, list] = {
-        CellValue.ZERO: ['images/zero.png', None],
-        CellValue.ONE: ['images/one.png', None],
-        CellValue.TWO: ['images/two.png', None],
-        CellValue.THREE: ['images/three.png', None],
-        CellValue.FOUR: ['images/four.png', None],
-        CellValue.FIVE: ['images/five.png', None],
-        CellValue.SIX: ['images/six.png', None],
-        CellValue.SEVEN: ['images/seven.png', None],
-        CellValue.EIGHT: ['images/eight.png', None],
-        CellValue.MINE: ['images/mine.png', None],
-        CellValue.FLAG: ['images/flag.png', None],
-        CellValue.COVERED: ['images/covered.png', None],
-    }
-
-    @classmethod
-    def get(cls, value: CellValue) -> tk.PhotoImage:
-        if value in cls._image_list:
-            if cls._image_list[value][1] is None:
-                cls._image_list[value][1] = tk.PhotoImage(file=cls._image_list[value][0])
-            return cls._image_list[value][1]
-        else:
-            raise ValueError("Must pass in valid Cell Value.")
 
 
 if __name__ == '__main__':

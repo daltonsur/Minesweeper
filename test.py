@@ -2,18 +2,17 @@ import unittest
 from minesweeper.minesweeper import *
 
 
-class TestBoardIcons(unittest.TestCase):
+class TestCellValues(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         tk.Tk()
 
-    def test_returns_image_for_all_possible_inputs(self):
+    def test_all_values_have_image(self):
         for value in CellValue:
-            self.assertIsInstance(BoardIcons.get(value), tk.PhotoImage)
+            self.assertIsInstance(value.image, tk.PhotoImage)
 
-    def test_returns_same_image_for_same_input(self):
-        self.assertEquals(BoardIcons.get(CellValue.ZERO),
-                          BoardIcons.get(CellValue.ZERO))
+    def test_returns_same_image_for_same_value(self):
+        self.assertEqual(CellValue.ZERO.image, CellValue.ZERO.image)
 
 
 if __name__ == '__main__':
